@@ -4,6 +4,7 @@ class Pidgin < Formula
   url "https://downloads.sourceforge.net/project/pidgin/Pidgin/2.14.13/pidgin-2.14.13.tar.bz2"
   sha256 "120049dc8e17e09a2a7d256aff2191ff8491abb840c8c7eb319a161e2df16ba8"
   license "GPL-2.0-or-later"
+  revision 1
 
   livecheck do
     url "https://sourceforge.net/projects/pidgin/files/Pidgin/"
@@ -22,6 +23,7 @@ class Pidgin < Formula
   end
 
   depends_on "intltool" => :build
+  depends_on "perl-xml-parser" => :build
   depends_on "pkg-config" => :build
   depends_on "cairo"
   depends_on "gettext"
@@ -32,6 +34,7 @@ class Pidgin < Formula
   depends_on "libidn"
   depends_on "libotr"
   depends_on "pango"
+  depends_on "perl"
 
   uses_from_macos "cyrus-sasl"
   uses_from_macos "ncurses"
@@ -41,11 +44,6 @@ class Pidgin < Formula
   on_linux do
     depends_on "libsm"
     depends_on "libxscrnsaver"
-
-    resource "XML::Parser" do
-      url "https://cpan.metacpan.org/authors/id/T/TO/TODDR/XML-Parser-2.46.tar.gz"
-      sha256 "d331332491c51cccfb4cb94ffc44f9cd73378e618498d4a37df9e043661c515d"
-    end
   end
 
   # Finch has an equal port called purple-otr but it is a NIGHTMARE to compile
@@ -56,20 +54,6 @@ class Pidgin < Formula
   end
 
   def install
-    unless OS.mac?
-      ENV.prepend_path "PERL5LIB", Formula["intltool"].libexec/"lib/perl5"
-      ENV.prepend_create_path "PERL5LIB", libexec/"lib/perl5"
-
-      perl_resources = %w[XML::Parser]
-      perl_resources.each do |r|
-        resource(r).stage do
-          system "perl", "Makefile.PL", "INSTALL_BASE=#{libexec}"
-          system "make"
-          system "make", "install"
-        end
-      end
-    end
-
     args = %W[
       --disable-debug
       --disable-dependency-tracking
@@ -116,6 +100,10 @@ class Pidgin < Formula
       perl_archlib = Utils.safe_popen_read(perl.to_s, "-MConfig", "-e", "print $Config{archlib}")
       ENV.append "LDFLAGS", "-Wl,-rpath,#{perl_archlib}/CORE"
     end
+
+    # Workaround for new clang.
+    ENV.append_to_cflags "-Wno-incompatible-function-pointer-types" if DevelopmentTools.clang_build_version >= 1500
+    ENV.append_to_cflags "-Wno-int-conversion" if DevelopmentTools.clang_build_version >= 1403
 
     system "./configure", *args
     system "make", "install"
